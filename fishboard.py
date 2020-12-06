@@ -5,6 +5,7 @@ import pathlib
 from typing import List, Optional, Union
 
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
@@ -12,6 +13,12 @@ from sklearn.linear_model import Lasso, LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVR
+
+#PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.impute import SimpleImputer
+
 
 
 # typ pro Streamlit kontejnery
@@ -158,13 +165,13 @@ def main() -> None:
         if data is None:
             st.warning("No data loaded")
             return
-
+        st.write("Vstupní data jsou ze souboru fish_data.csv") 
+    
         # vstup 2: výběr parametrů scatter matrix
         dimensions = st.multiselect("Scatter matrix dimensions", list(data.columns[1:-1]), default=list(data.columns[1:-1]))
         color = st.selectbox("Color", data.columns[1:-1])
         opacity = st.slider("Opacity", 0.0, 1.0, 0.5)
-
-    st.write("Vstupní data jsou ze souboru fish_data.csv")  
+  
     source_data = load_data(DATA_DIR/'fish_data.csv')
     
     with col1.beta_expander("Preprocessing"):
@@ -176,10 +183,10 @@ def main() -> None:
         display_preprocessed = st.checkbox("Zobrazit preprocesovaná data", value=False)
         if display_preprocessed:
             displayed_data = learning_data
-            # st.dataframe(displayed_data)
+            st.dataframe(displayed_data)
         else:
             displayed_data = source_data
-            # st.dataframe(displayed_data)
+            st.dataframe(displayed_data)
         
         # scatter matrix plot
         st.write(px.scatter_matrix(data, dimensions=dimensions, color=color, opacity=opacity))
@@ -192,6 +199,24 @@ def main() -> None:
         st.write(dist_plot(data, x=interesting_column, color=color))
 
         st.dataframe(displayed_data)
+    
+    with col1.beta_expander("PCA"):
+        #PCA
+        source_data = load_data(DATA_DIR/'fish_data.csv')
+        scaler = StandardScaler()
+        data_scaled = scaler.fit_transform(source_data.drop(columns=['Species', 'ID']))
+
+        imp = SimpleImputer(missing_values=np.nan, strategy='median')  ## vybrala bych 'mean' nebo 'median'
+        data_imp = imp.fit_transform(data_scaled)
+
+        data_final = pd.DataFrame(data_imp, columns=source_data.columns[2:], index=source_data.ID)
+
+        pca = PCA(n_components=2)
+        data_pca = pd.DataFrame(pca.fit_transform(data_final), columns=['PCA1', 'PCA2'])
+
+        st.write(px.scatter(x=data_pca.PCA1, y=data_pca.PCA2,color=source_data.Species,
+                        hover_name =source_data['ID']))
+
 
     target = col1.selectbox("Sloupec s odezvou", learning_data.columns)
 
