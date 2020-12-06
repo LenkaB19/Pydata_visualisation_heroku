@@ -50,7 +50,6 @@ REGRESSION_MODELS = {
 # názvy metrik a příslušné funkce pro výpočet
 METRICS = {"MAE": mean_absolute_error, "MSE": mean_squared_error, "R2": r2_score}
 
-
 @st.cache
 def load_data(csv_file: Union[str, pathlib.Path, io.IOBase]) -> pd.DataFrame:
     return pd.read_csv(csv_file, index_col=0)
@@ -148,10 +147,26 @@ def main() -> None:
     col1, col2 = st.beta_columns(2)
 
     with col1.beta_expander("Výběr dat"):
-        # TODO použí file upload for načtení uživatelských dat
-        st.write("Vstupní data jsou ze souboru fish_data.csv")
-    source_data = load_data(DATA_DIR / "fish_data.csv")
+        # vstup 1: výběr datové sady
+        data_file_path = st.file_uploader("Data file")
+        data = None
+        if data_file_path is not None:
+            # read data if user uploads a file
+            data = pd.read_csv(data_file_path)
+            # seek back to position 0 after reading
+            data_file_path.seek(0)
+        if data is None:
+            st.warning("No data loaded")
+            return
 
+        # vstup 2: výběr parametrů scatter matrix
+        dimensions = st.multiselect("Scatter matrix dimensions", list(data.columns[1:-1]), default=list(data.columns[1:-1]))
+        color = st.selectbox("Color", data.columns[1:-1])
+        opacity = st.slider("Opacity", 0.0, 1.0, 0.5)
+
+    st.write("Vstupní data jsou ze souboru fish_data.csv")  
+    source_data = load_data(DATA_DIR/'fish_data.csv')
+    
     with col1.beta_expander("Preprocessing"):
         drop_columns = st.multiselect("Drop columns", source_data.columns)
         get_dummies = st.checkbox("Get dummies")
@@ -165,7 +180,17 @@ def main() -> None:
         else:
             displayed_data = source_data
             # st.dataframe(displayed_data)
-        # TODO přidat grafy
+        
+        # scatter matrix plot
+        st.write(px.scatter_matrix(data, dimensions=dimensions, color=color, opacity=opacity))
+
+        # výběr sloupce pro zobrazení rozdělení dat
+        interesting_column = st.selectbox("Interesting column", data.columns[1:-1])
+        # výběr funkce pro zobrazení rozdělovací funkce
+        dist_plot = st.selectbox("Plot type", [px.box, px.histogram, px.violin])
+
+        st.write(dist_plot(data, x=interesting_column, color=color))
+
         st.dataframe(displayed_data)
 
     target = col1.selectbox("Sloupec s odezvou", learning_data.columns)
